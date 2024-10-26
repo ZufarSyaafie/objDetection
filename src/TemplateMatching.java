@@ -10,8 +10,10 @@ import org.opencv.highgui.HighGui;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class TemplateMatching {
     static {
@@ -41,6 +43,7 @@ public class TemplateMatching {
 
         List<Rect> boundingBoxes = new ArrayList<>();
         Map<String, Scalar> labelColors = new HashMap<>();
+        Set<String> detectedLabels = new HashSet<>();
         labelColors.put("Apel", new Scalar(0, 255, 0)); // Hijau
         labelColors.put("Pisang", new Scalar(0, 0, 255)); // Merah
 
@@ -83,8 +86,7 @@ public class TemplateMatching {
                                 new Point(matchLoc.x + templateImage.cols(), matchLoc.y + templateImage.rows())
                         );
                         currentBoxes.add(boundingBox);
-                        // Menampilkan hasil deteksi di konsol
-                        System.out.println("Terdeteksi: " + label + " di (" + matchLoc.x + ", " + matchLoc.y + ") dengan nilai kecocokan: " + matchValue);
+                        detectedLabels.add(label); // Menambahkan label ke set
                     }
                 }
             }
@@ -102,8 +104,14 @@ public class TemplateMatching {
             }
         }
 
+        // Menampilkan label objek yang terdeteksi
+        System.out.println("Objek terdeksi adalah:");
+        for (String label : detectedLabels) {
+            System.out.println(label);
+        }
+
         // Menampilkan jumlah objek yang terdeteksi
-        System.out.println("\nJumlah objek yang terdeteksi: " + boundingBoxes.size());
+        System.out.println("\nJumlah Objek Terdeksi: " + boundingBoxes.size());
 
         // Memperbesar gambar keluaran sebelum menampilkannya
         Mat enlargedImage = new Mat();
