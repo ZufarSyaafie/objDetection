@@ -9,7 +9,9 @@ import org.opencv.imgproc.Imgproc;
 import org.opencv.highgui.HighGui;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class TemplateMatching {
     static {
@@ -22,7 +24,7 @@ public class TemplateMatching {
         // Membaca gambar sumber
         Mat sourceImage = Imgcodecs.imread(imagePath, Imgcodecs.IMREAD_GRAYSCALE);
         if (sourceImage.empty()) {
-            System.out.println("Error: Cannot load source image.");
+            System.out.println("Error: Tidak dapat memuat gambar sumber.");
             return;
         }
 
@@ -33,20 +35,23 @@ public class TemplateMatching {
                 {"src/template/banana2.jpg", "Pisang"}
         };
 
-        // Create a copy of the original image for display and convert to BGR
+        // Membuat salinan gambar asli untuk ditampilkan dan mengonversi ke BGR
         Mat displayImage = new Mat();
         Imgproc.cvtColor(sourceImage, displayImage, Imgproc.COLOR_GRAY2BGR);
 
         List<Rect> boundingBoxes = new ArrayList<>();
+        Map<String, Scalar> labelColors = new HashMap<>();
+        labelColors.put("Apel", new Scalar(0, 255, 0)); // Hijau
+        labelColors.put("Pisang", new Scalar(0, 0, 255)); // Merah
 
         for (String[] templateData : templates) {
             Mat templateImage = Imgcodecs.imread(templateData[0], Imgcodecs.IMREAD_GRAYSCALE);
             if (templateImage.empty()) {
-                System.out.println("Error: Cannot load template image " + templateData[0]);
+                System.out.println("Error: Tidak dapat memuat gambar template " + templateData[0]);
                 continue;
             }
 
-            // Mengubah ukuran template agar lebih kecil jika perlu
+            // Mengubah ukuran template jika perlu
             if (templateImage.cols() > sourceImage.cols() || templateImage.rows() > sourceImage.rows()) {
                 Mat resizedTemplate = new Mat();
                 Size newSize = new Size(sourceImage.cols() * 0.5, sourceImage.rows() * 0.5);
@@ -63,14 +68,15 @@ public class TemplateMatching {
             // Menentukan threshold
             double threshold = 0.6;
 
-            // List untuk menyimpan bounding box yang ditemukan dari template saat ini
+            // Daftar untuk menyimpan bounding box yang ditemukan dari template saat ini
             List<Rect> currentBoxes = new ArrayList<>();
 
-            // Melakukan deteksi semua titik yang sesuai dengan threshold
+            // Mendeteksi semua titik yang sesuai dengan threshold
             for (int y = 0; y < outputImage.rows(); y++) {
                 for (int x = 0; x < outputImage.cols(); x++) {
-                    // Cek apakah nilai kecocokan pada titik ini lebih besar dari threshold
-                    if (outputImage.get(y, x)[0] >= threshold) {
+                    // Memeriksa apakah nilai kecocokan pada titik ini lebih besar dari threshold
+                    double matchValue = outputImage.get(y, x)[0];
+                    if (matchValue >= threshold) {
                         Point matchLoc = new Point(x, y);
                         Rect boundingBox = new Rect(
                                 new Point(matchLoc.x, matchLoc.y),
@@ -78,38 +84,37 @@ public class TemplateMatching {
                         );
                         currentBoxes.add(boundingBox);
                         // Menampilkan hasil deteksi di konsol
-                        System.out.println("Terdeksi: " + label + " di (" + matchLoc.x + ", " + matchLoc.y + ")");
+                        System.out.println("Terdeteksi: " + label + " di (" + matchLoc.x + ", " + matchLoc.y + ") dengan nilai kecocokan: " + matchValue);
                     }
                 }
             }
 
-            // Lakukan Non-Maximum Suppression (NMS) untuk menggabungkan bounding box yang tumpang tindih
+            // Melakukan Non-Maximum Suppression (NMS) untuk menggabungkan bounding box yang tumpang tindih
             List<Rect> finalBoxes = nonMaximumSuppression(currentBoxes);  // Threshold IoU = 0.5
             boundingBoxes.addAll(finalBoxes); // Menambahkan semua kotak akhir ke daftar boundingBoxes
 
             // Menandai hasil akhir pada gambar
             for (Rect box : finalBoxes) {
-                Imgproc.rectangle(displayImage, box.tl(), box.br(), new Scalar(255, 0, 0), 2);
+                Scalar color = labelColors.getOrDefault(label, new Scalar(255, 0, 0)); // Warna default adalah biru
+                Imgproc.rectangle(displayImage, box.tl(), box.br(), color, 2);
                 Imgproc.putText(displayImage, label, new Point(box.x, box.y + 20),
-                        Imgproc.FONT_HERSHEY_SIMPLEX, 0.75, new Scalar(255, 0, 0), 2);
+                        Imgproc.FONT_HERSHEY_SIMPLEX, 0.75, color, 2);
             }
         }
 
-        // Menampilkan Jumlah Objek yang terdeteksi
-        System.out.println("\nJumlah Objek yang terdeteksi: " + boundingBoxes.size());
-
+        // Menampilkan jumlah objek yang terdeteksi
+        System.out.println("\nJumlah objek yang terdeteksi: " + boundingBoxes.size());
 
         // Memperbesar gambar keluaran sebelum menampilkannya
         Mat enlargedImage = new Mat();
         Size newSize = new Size(displayImage.cols() * 2, displayImage.rows() * 2); // Menggandakan ukuran
-        //Tampilkan di GUI Jumlah Objek yang terdeteksi
+        // Menampilkan jumlah objek yang terdeteksi di GUI
         Imgproc.putText(displayImage, "Objek: " + boundingBoxes.size(), new Point(0, 90),
                 Imgproc.FONT_HERSHEY_SIMPLEX, 0.3, new Scalar(255, 0, 0), 1);
         Imgproc.resize(displayImage, enlargedImage, newSize);
 
-
         // Menampilkan hasil sekali saja setelah semua template diproses
-        HighGui.imshow("Matched Result", enlargedImage);
+        HighGui.imshow("Hasil Pencocokan", enlargedImage);
         HighGui.waitKey();
         HighGui.destroyAllWindows();
     }
@@ -118,13 +123,13 @@ public class TemplateMatching {
     private static List<Rect> nonMaximumSuppression(List<Rect> boxes) {
         List<Rect> finalBoxes = new ArrayList<>();
 
-        // Selama masih ada box dalam list, terus lakukan NMS
+        // Selama masih ada box dalam daftar, terus lakukan NMS
         while (!boxes.isEmpty()) {
             // Ambil box pertama
             Rect bestBox = boxes.removeFirst();
             finalBoxes.add(bestBox);
 
-            // Cek overlap untuk setiap box lainnya
+            // Memeriksa overlap untuk setiap box lainnya
             // Jika IoU lebih besar dari threshold, hapus box yang tumpang tindih
             boxes.removeIf(box -> computeIoU(bestBox, box) > 0.5);
         }
@@ -134,7 +139,7 @@ public class TemplateMatching {
 
     // Fungsi untuk menghitung Intersection over Union (IoU)
     private static double computeIoU(Rect box1, Rect box2) {
-        // Hitung koordinat titik overlap
+        // Menghitung koordinat area overlap
         double x1 = Math.max(box1.x, box2.x);
         double y1 = Math.max(box1.y, box2.y);
         double x2 = Math.min(box1.x + box1.width, box2.x + box2.width);
@@ -147,7 +152,7 @@ public class TemplateMatching {
         double box1Area = box1.width * box1.height;
         double box2Area = box2.width * box2.height;
 
-        // Hitung IoU
+        // Menghitung IoU
         return overlapArea / (box1Area + box2Area - overlapArea);
     }
 }
